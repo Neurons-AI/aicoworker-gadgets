@@ -72,8 +72,14 @@ def ask_ani(text: str) -> str:
         if not _token:
             r = requests.post(f"{CHAT_BASE}/auth", json={"uid": CHAT_UID, "username": os.environ.get("AICW_CHAT_NAME", "AICW Stick")}, timeout=15)
             _token = r.json()["token"]
-        r = requests.post(f"{CHAT_BASE}/message", params={"token": _token},
-                          json={"message": PREFIX + text}, timeout=190)
+        try:
+            r = requests.post(f"{CHAT_BASE}/message", params={"token": _token},
+                              json={"message": PREFIX + text}, timeout=190)
+        except requests.exceptions.ConnectionError:
+            if attempt == 0:   # AICoworker restarting: wait a moment, try once more
+                time.sleep(3)
+                continue
+            raise
         j = r.json()
         if j.get("ok"):
             return j.get("reply") or ""
@@ -82,6 +88,15 @@ def ask_ani(text: str) -> str:
             continue
         raise RuntimeError(j.get("error") or f"http {r.status_code}")
     raise RuntimeError("auth failed")
+
+def friendly_error(e: Exception) -> str:
+    """Short text the stick can show instead of a raw Python error."""
+    m = str(e)
+    if isinstance(e, requests.exceptions.ReadTimeout) or "Read timed out" in m:
+        return "Agent trả lời quá lâu, thử lại nha"
+    if isinstance(e, requests.exceptions.ConnectionError) or "HTTPConnectionPool" in m:
+        return "Không gọi được AICoworker trên máy"
+    return m[:60]
 
 def speakable(text: str) -> str:
     t = re.sub(r"```.*?```", " ", text, flags=re.S)
@@ -158,7 +173,7 @@ async def handle(ws):
         except Exception as e:
             log.exception("turn %s failed", tid)
             try:
-                await send({"type": "error", "id": tid, "text": str(e)[:80]})
+                await send({"type": "error", "id": tid, "text": friendly_error(e)})
             except Exception:
                 pass
 

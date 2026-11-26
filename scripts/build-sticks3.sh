@@ -14,5 +14,5 @@ if [ "$1" = "flash" ]; then
   ACT="-p $PORT flash"
 fi
 idf.py -B build-aicw-sticks3 -DIDF_TARGET=esp32s3 -DSDKCONFIG=build-aicw-sticks3/sdkconfig \
-  "-DSDKCONFIG_DEFAULTS=sdkconfig.defaults;devices/sdkconfig.dou;devices/sdkconfig.dou-m5stack-sticks3;devices/sdkconfig.aicw-sticks3" \
+  "-DSDKCONFIG_DEFAULTS=sdkconfig.defaults;devices/sdkconfig.dou;devices/sdkconfig.dou-m5stack-sticks3;devices/sdkconfig.aicw" \
   $ACT

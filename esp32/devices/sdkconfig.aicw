@@ -1,4 +1,4 @@
-# AICW Stick: push-to-talk to the AICoworker bridge (../docs/PROTOCOL.md)
+# AICW Gadgets: push-to-talk to your AICoworker (docs/PROTOCOL.md). Add after the board overlays.
 CONFIG_DOU_AICW_BRIDGE=y
 CONFIG_DOU_REALTIME_VOICE=n
 CONFIG_DOU_RESEND_NOTES=n

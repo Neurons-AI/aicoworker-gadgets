@@ -1,0 +1,116 @@
+# Builds AICW Gadgets firmware for every board with the AICW voice link and, on a tag v*,
+# publishes a GitHub Release with one merged image per board plus manifest.json — the AICW
+# Gadgets app (AICoworker → AI Apps) reads that manifest to flash a board.
+name: firmware
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+    paths: ['esp32/**', '.github/workflows/firmware.yml']
+  pull_request:
+    paths: ['esp32/**', '.github/workflows/firmware.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: ${{ matrix.board }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { board: m5stack-sticks3,       target: esp32s3, overlays: "devices/sdkconfig.dou;devices/sdkconfig.dou-m5stack-sticks3" }
+          - { board: espressif-box-3,       target: esp32s3, overlays: "devices/sdkconfig.dou;devices/sdkconfig.dou-espressif-box-3" }
+          - { board: m5stack-cores3,        target: esp32s3, overlays: "devices/sdkconfig.dou;devices/sdkconfig.dou-m5stack-cores3" }
+          - { board: m5stack-atoms3,        target: esp32s3, overlays: "devices/sdkconfig.dou;devices/sdkconfig.dou-m5stack-atoms3" }
+          - { board: waveshare-s3-175c,     target: esp32s3, overlays: "devices/sdkconfig.dou;devices/sdkconfig.dou-waveshare-s3-175c" }
+          - { board: waveshare-s3-185b,     target: esp32s3, overlays: "devices/sdkconfig.dou;devices/sdkconfig.dou-waveshare-s3-185b" }
+          - { board: waveshare-s3-185c,     target: esp32s3, overlays: "devices/sdkconfig.dou;devices/sdkconfig.dou-waveshare-s3-185c" }
+          - { board: seeed-xiao-s3-147,     target: esp32s3, overlays: "devices/sdkconfig.dou;devices/sdkconfig.dou-seeed-xiao-s3-147" }
+          - { board: sensecap-watcher,      target: esp32s3, overlays: "devices/sdkconfig.dou;devices/sdkconfig.dou-sensecap-watcher" }
+          - { board: reterminal-sticky,     target: esp32s3, overlays: "devices/sdkconfig.dou;devices/sdkconfig.reterminal-sticky" }
+          - { board: aipi,                  target: esp32s3, overlays: "devices/sdkconfig.dou;devices/sdkconfig.dou-aipi" }
+          - { board: m5stack-stopwatch,     target: esp32s3, overlays: "devices/sdkconfig.dou;devices/sdkconfig.dou-m5stack-stopwatch" }
+          - { board: m5stack-stickc-plus2,  target: esp32,   overlays: "devices/sdkconfig.dou;devices/sdkconfig.dou-m5stack-stickc-plus2" }
+          - { board: m5stack-core2,         target: esp32,   overlays: "devices/sdkconfig.dou;devices/sdkconfig.dou-m5stack-core2" }
+          - { board: waveshare-s3-175,      target: esp32s3, overlays: "devices/sdkconfig.dou;devices/sdkconfig.dou-waveshare-s3-175" }
+          - { board: waveshare-s3-216,      target: esp32s3, overlays: "devices/sdkconfig.dou;devices/sdkconfig.dou-waveshare-s3-216" }
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Free disk space
+        run: sudo rm -rf /usr/local/lib/android && df -h /
+
+      - name: Build
+        uses: espressif/esp-idf-ci-action@9d38657f3d789ca759b2b37aaf5ceffbc42c4f0d # v1
+        with:
+          esp_idf_version: v6.0.3
+          target: ${{ matrix.target }}
+          path: esp32
+          command: |
+            set -e
+            # A throw-away development signing key: the image is signed for the app's own
+            # update check; boards flashed over USB do not enforce it.
+            [ -f dev_signing_key.pem ] || idf.py secure-generate-signing-key --version 2 --scheme rsa3072 dev_signing_key.pem
+            idf.py -B build -DIDF_TARGET=${{ matrix.target }} \
+              "-DSDKCONFIG_DEFAULTS=sdkconfig.defaults;${{ matrix.overlays }};devices/sdkconfig.aicw" build
+            cd build
+            python -m esptool --chip ${{ matrix.target }} merge-bin -o ../aicw-gadgets-${{ matrix.board }}.bin @flash_args
+
+      - name: Describe
+        run: |
+          f=esp32/aicw-gadgets-${{ matrix.board }}.bin
+          python3 - "$f" "${{ matrix.board }}" "${{ matrix.target }}" <<'EOF'
+          import hashlib, json, os, sys
+          f, board, chip = sys.argv[1:4]
+          d = open(f, 'rb').read()
+          json.dump({board: {"file": os.path.basename(f), "offset": 0, "size": len(d), "sha256": hashlib.sha256(d).hexdigest(), "chip": chip}},
+                    open(f'esp32/{board}.json', 'w'))
+          EOF
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: fw-${{ matrix.board }}
+          path: |
+            esp32/aicw-gadgets-${{ matrix.board }}.bin
+            esp32/${{ matrix.board }}.json
+          retention-days: 14
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v') && !cancelled()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: fw-*
+          merge-multiple: true
+          path: out
+      - name: Manifest
+        run: |
+          cd out
+          python3 - <<'EOF'
+          import glob, json
+          boards = {}
+          for f in sorted(glob.glob('*.json')):
+              boards.update(json.load(open(f)))
+          json.dump({"version": "${{ github.ref_name }}", "boards": boards}, open('manifest.json', 'w'), indent=1)
+          print(len(boards), 'boards')
+          EOF
+          rm -f $(ls *.json | grep -v manifest.json)
+          ls -la
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ github.ref_name }}" out/* --repo "${{ github.repository }}" \
+            --title "AICW Gadgets ${{ github.ref_name }}" \
+            --notes "Firmware for every board in manifest.json. Flash it from AICoworker → AI Apps → AICW Gadgets → Install. Tested end to end: M5Stack StickS3. Other boards build with the AICW voice link but are not tested on hardware yet." \
+            $([[ "${{ github.ref_name }}" == *-* ]] && echo --prerelease)

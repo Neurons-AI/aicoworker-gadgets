@@ -82,6 +82,7 @@ async def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--url", default="ws://127.0.0.1:8765/stick")
     ap.add_argument("--say"); ap.add_argument("--text"); ap.add_argument("--out"); ap.add_argument("--mute", action="store_true")
+    ap.add_argument("--pcm", help="raw PCM16 16 kHz mono file to send as the voice turn")
     ap.add_argument("--relay", help="hostId: go through wss://agent.aicoworker.net instead of the LAN")
     a = ap.parse_args()
     if a.relay:
@@ -97,8 +98,8 @@ async def body(ws, a):
     if True:
         await ws.send(json.dumps({"type": "hello", "device": "fake-stick", "mac": "000000000000", "fw": "sim"}))
         print("bridge:", json.loads(await ws.recv()))
-        if a.say or a.text:
-            pcm = await synth(a.say) if a.say else None
+        if a.say or a.text or getattr(a, "pcm", None):
+            pcm = open(a.pcm, "rb").read() if getattr(a, "pcm", None) else (await synth(a.say) if a.say else None)
             r = await turn(ws, 1, pcm=pcm, text=a.text, out=a.out, mute=a.mute)
             print("RESULT", json.dumps(r, ensure_ascii=False))
             sys.exit(0 if r["ok"] else 1)
