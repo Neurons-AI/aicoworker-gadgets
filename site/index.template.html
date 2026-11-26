@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="vi" data-lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AICW Gadgets: trợ lý AI bỏ túi của riêng bạn</title>
+<meta name="description" content="Biến board ESP32 giá rẻ thành gadget nói chuyện với trợ lý AI trên máy tính của bạn. Firmware mã nguồn mở, cài bằng một cú bấm.">
+<meta property="og:title" content="AICW Gadgets">
+<meta property="og:description" content="Open source voice gadgets for your own AI agent, powered by AICoworker.">
+<meta property="og:image" content="https://gadgets.aicoworker.net/img/dou-happy.png">
+<link rel="icon" href="/img/icon.png">
+<link rel="canonical" href="https://gadgets.aicoworker.net/">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#14111f;--bg2:#1c1830;--card:#221d39;--line:#352d55;--fg:#f4efe6;--muted:#b4aac8;--glow:#ffe9a8;--accent:#ffcf5c;--pink:#ff8fb1;--ok:#7be0a6;--r:18px}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 "Be Vietnam Pro",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:inherit}
+[data-lang=vi] [lang=en],[data-lang=en] [lang=vi]{display:none}
+.wrap{width:min(1120px,100% - 40px);margin:0 auto}
+nav{position:sticky;top:0;z-index:10;background:rgba(20,17,31,.82);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+nav .wrap{display:flex;align-items:center;gap:20px;height:64px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;text-decoration:none;letter-spacing:-.01em}
+.brand img{width:32px;height:32px;border-radius:9px}
+nav .links{display:flex;gap:22px;margin-left:auto;font-size:14px;color:var(--muted)}
+nav .links a{text-decoration:none}nav .links a:hover{color:var(--fg)}
+.lang{background:var(--card);border:1px solid var(--line);color:var(--fg);border-radius:999px;padding:6px 12px;font:600 13px inherit;cursor:pointer}
+.btn{display:inline-flex;align-items:center;gap:8px;border-radius:999px;padding:13px 22px;font-weight:700;text-decoration:none;border:1px solid transparent;transition:transform .15s,background .15s}
+.btn:hover{transform:translateY(-1px)}
+.btn.primary{background:var(--accent);color:#231a05}
+.btn.ghost{border-color:var(--line);color:var(--fg)}
+.btn.ghost:hover{background:var(--card)}
+.eyebrow{font:500 12px "JetBrains Mono",monospace;letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+h1{font-size:clamp(40px,6.4vw,76px);line-height:1.02;letter-spacing:-.035em;margin:14px 0 20px;font-weight:800}
+h1 em{font-style:normal;color:var(--glow);text-shadow:0 0 34px rgba(255,214,120,.35)}
+h2{font-size:clamp(28px,3.6vw,44px);letter-spacing:-.025em;line-height:1.1;margin:10px 0 14px}
+.lead{font-size:clamp(17px,1.6vw,20px);color:var(--muted);max-width:620px}
+.hero{padding:clamp(48px,9vw,110px) 0 70px;display:grid;grid-template-columns:1.15fr .85fr;gap:48px;align-items:center}
+.hero .cta{display:flex;gap:12px;flex-wrap:wrap;margin-top:30px}
+.hero .note{margin-top:16px;font-size:13px;color:var(--muted)}
+.stick{position:relative;aspect-ratio:1;max-width:420px;justify-self:center;width:100%}
+.stick .face{position:absolute;inset:0;border-radius:36px;background:radial-gradient(60% 60% at 50% 45%,#463a7a,#1d1834 72%);display:grid;place-items:center;box-shadow:0 30px 80px rgba(0,0,0,.45),inset 0 0 0 1px var(--line);overflow:hidden}
+.stick .face img{width:86%;transition:opacity .5s}
+.stick .bubble{position:absolute;right:-6px;top:24px;background:var(--fg);color:#1b1530;padding:10px 14px;border-radius:16px 16px 4px 16px;font-weight:700;font-size:14px;box-shadow:0 10px 30px rgba(0,0,0,.35);max-width:220px}
+.stick .bubble2{right:auto;left:-10px;top:auto;bottom:36px;border-radius:16px 16px 16px 4px;background:var(--accent)}
+section{padding:80px 0;border-top:1px solid var(--line)}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:34px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:26px}
+.card h3{margin:12px 0 6px;font-size:19px}
+.card p{margin:0;color:var(--muted);font-size:15px}
+.num{font:600 13px "JetBrains Mono",monospace;color:var(--accent)}
+.steps{counter-reset:s;display:grid;gap:16px;margin-top:34px}
+.step{display:grid;grid-template-columns:64px 1fr auto;gap:20px;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:22px 24px}
+.step .n{width:52px;height:52px;border-radius:16px;display:grid;place-items:center;background:var(--bg2);border:1px solid var(--line);font-weight:800;font-size:20px;color:var(--glow)}
+.step h3{margin:0 0 4px;font-size:19px}
+.step p{margin:0;color:var(--muted);font-size:15px}
+.step .btn{white-space:nowrap}
+.step ul{margin:8px 0 0;padding-left:18px;color:var(--muted);font-size:14px}
+.tip{margin-top:20px;padding:16px 20px;border-radius:14px;background:rgba(255,207,92,.08);border:1px dashed rgba(255,207,92,.4);color:var(--fg);font-size:15px}
+.devices{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,250px),1fr));gap:16px;margin-top:34px}
+.dev{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:20px;display:flex;flex-direction:column}
+.dev.ready{border-color:rgba(123,224,166,.5);box-shadow:0 0 0 1px rgba(123,224,166,.15),0 18px 40px rgba(0,0,0,.25)}
+.dev-top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.chip{font:500 11px "JetBrains Mono",monospace;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:2px 8px}
+.badge{font-size:11px;font-weight:700;border-radius:999px;padding:3px 9px;background:var(--bg2);color:var(--muted)}
+.badge.ok{background:rgba(123,224,166,.14);color:var(--ok)}
+.dev h3{font-size:17px;margin:14px 0 6px;line-height:1.3}
+.dev p{margin:0 0 14px;color:var(--muted);font-size:14px;flex:1}
+.dev-links{display:flex;gap:16px;font-size:14px;font-weight:600}
+.dev-links a{color:var(--accent);text-decoration:none}.dev-links a:hover{text-decoration:underline}
+.soon{margin-top:22px;color:var(--muted);font-size:14px}
+.soon ul{display:inline;padding:0;margin:0}.soon li{display:inline}.soon li:not(:last-child)::after{content:" · "}
+.faces{display:flex;gap:12px;margin-top:30px;flex-wrap:wrap}
+.faces img{width:84px;height:84px;border-radius:20px;border:1px solid var(--line)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:center}
+.shot{border-radius:var(--r);border:1px solid var(--line);width:100%;box-shadow:0 24px 60px rgba(0,0,0,.4)}
+.oss{display:flex;gap:14px;flex-wrap:wrap;margin-top:26px}
+footer{border-top:1px solid var(--line);padding:36px 0 50px;color:var(--muted);font-size:14px}
+footer .wrap{display:flex;gap:16px;justify-content:space-between;flex-wrap:wrap}
+footer a{color:var(--fg)}
+.fine{font-size:12px;margin-top:10px;max-width:640px}
+@media (max-width:860px){.hero,.two{grid-template-columns:1fr}.grid3{grid-template-columns:1fr}.step{grid-template-columns:52px 1fr}.step .btn{grid-column:1/-1;justify-self:start}nav .links{display:none}.stick{max-width:320px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto}}
+</style>
+</head>
+<body>
+<nav><div class="wrap">
+  <a class="brand" href="/"><img src="/img/icon.png" alt="">AICW Gadgets</a>
+  <div class="links"><a href="#how" data-i18n="nav_how"></a><a href="#start" data-i18n="nav_start"></a><a href="#devices" data-i18n="nav_devices"></a><a href="#source" data-i18n="nav_source"></a><a href="https://aicoworker.net">AICoworker</a></div>
+  <button class="lang" id="lang" aria-label="Language">EN</button>
+</div></nav>
+
+<header class="wrap hero">
+  <div>
+    <div class="eyebrow" data-i18n="eyebrow"></div>
+    <h1><span lang="vi">Trợ lý AI <em>bỏ túi</em> của riêng bạn</span><span lang="en">Your own AI, <em>in your pocket</em></span></h1>
+    <p class="lead"><span lang="vi">Biến một board ESP32 giá vài trăm nghìn thành gadget biết nghe, biết nói, nối thẳng với trợ lý AI chạy trên máy tính của bạn. Không cần tài khoản đám mây, không thuê bao, mã nguồn mở hoàn toàn.</span><span lang="en">Turn an inexpensive ESP32 board into a gadget that listens, talks and connects straight to the AI agent running on your own computer. No cloud account, no subscription, fully open source.</span></p>
+    <div class="cta">
+      <a class="btn primary" href="#start" data-i18n="cta_start"></a>
+      <a class="btn ghost" href="https://store.aicoworker.net/skills/aicw-gadgets" target="_blank" rel="noopener" data-i18n="cta_store"></a>
+    </div>
+    <p class="note" data-i18n="hero_note"></p>
+  </div>
+  <div class="stick">
+    <div class="face"><img id="face" src="/img/dou-happy.png" alt="Dou"></div>
+    <div class="bubble" data-i18n="bubble1"></div>
+    <div class="bubble bubble2" data-i18n="bubble2"></div>
+  </div>
+</header>
+
+<section id="how"><div class="wrap">
+  <div class="eyebrow">01 / <span data-i18n="how_eb"></span></div>
+  <h2><span lang="vi">Bấm nút, nói, trợ lý của bạn trả lời</span><span lang="en">Press, speak, your agent answers</span></h2>
+  <p class="lead"><span lang="vi">Gadget chỉ lo nghe và nói. Mọi suy nghĩ diễn ra trên AICoworker của bạn, với đúng trợ lý, trí nhớ và công cụ bạn đã thiết lập.</span><span lang="en">The gadget only listens and speaks. All the thinking happens on your AICoworker, with the same agent, memory and tools you already set up.</span></p>
+  <div class="grid3">
+    <div class="card"><div class="num">A</div><h3 data-i18n="f1_t"></h3><p data-i18n="f1_p"></p></div>
+    <div class="card"><div class="num">B</div><h3 data-i18n="f2_t"></h3><p data-i18n="f2_p"></p></div>
+    <div class="card"><div class="num">C</div><h3 data-i18n="f3_t"></h3><p data-i18n="f3_p"></p></div>
+    <div class="card"><div class="num">D</div><h3 data-i18n="f4_t"></h3><p data-i18n="f4_p"></p></div>
+    <div class="card"><div class="num">E</div><h3 data-i18n="f5_t"></h3><p data-i18n="f5_p"></p></div>
+    <div class="card"><div class="num">F</div><h3 data-i18n="f6_t"></h3><p data-i18n="f6_p"></p></div>
+  </div>
+  <div class="faces" aria-label="Dou">
+    <img src="/img/dou-normal.png" alt=""><img src="/img/dou-happy.png" alt=""><img src="/img/dou-love.png" alt=""><img src="/img/dou-shy.png" alt=""><img src="/img/dou-surprised.png" alt=""><img src="/img/dou-sad.png" alt=""><img src="/img/dou-think.png" alt=""><img src="/img/dou-sleep.png" alt="">
+  </div>
+</div></section>
+
+<section id="start"><div class="wrap">
+  <div class="eyebrow">02 / <span data-i18n="start_eb"></span></div>
+  <h2><span lang="vi">Bắt đầu trong khoảng 10 phút</span><span lang="en">Up and running in about 10 minutes</span></h2>
+  <p class="lead"><span lang="vi">Bạn cần: một board được hỗ trợ (bên dưới), một sợi cáp USB truyền dữ liệu, Wi-Fi 2.4 GHz và một máy tính Windows, macOS hoặc Linux có Bluetooth.</span><span lang="en">You need: a supported board (below), a USB data cable, 2.4 GHz Wi-Fi and a Windows, macOS or Linux computer with Bluetooth.</span></p>
+  <div class="steps">
+    <div class="step"><div class="n">1</div><div>
+      <h3 data-i18n="s1_t"></h3>
+      <p data-i18n="s1_p"></p>
+    </div><a class="btn primary" href="https://aicoworker.net/#download" target="_blank" rel="noopener" data-i18n="s1_btn"></a></div>
+
+    <div class="step"><div class="n">2</div><div>
+      <h3 data-i18n="s2_t"></h3>
+      <p data-i18n="s2_p"></p>
+    </div><a class="btn primary" href="https://store.aicoworker.net/skills/aicw-gadgets" target="_blank" rel="noopener" data-i18n="s2_btn"></a></div>
+
+    <div class="step"><div class="n">3</div><div>
+      <h3 data-i18n="s3_t"></h3>
+      <p data-i18n="s3_p"></p>
+      <ul><li data-i18n="s3_l1"></li><li data-i18n="s3_l2"></li><li data-i18n="s3_l3"></li></ul>
+    </div></div>
+
+    <div class="step"><div class="n">4</div><div>
+      <h3 data-i18n="s4_t"></h3>
+      <p data-i18n="s4_p"></p>
+      <ul><li data-i18n="s4_l1"></li><li data-i18n="s4_l2"></li><li data-i18n="s4_l3"></li></ul>
+    </div></div>
+
+    <div class="step"><div class="n">5</div><div>
+      <h3 data-i18n="s5_t"></h3>
+      <p data-i18n="s5_p"></p>
+    </div></div>
+  </div>
+  <div class="tip" data-i18n="tip"></div>
+</div></section>
+
+<section><div class="wrap two">
+  <div>
+    <div class="eyebrow">03 / <span data-i18n="two_eb"></span></div>
+    <h2><span lang="vi">Máy chủ AI ở nhà, cài gadget từ máy nào cũng được</span><span lang="en">AI at home, set up gadgets from any computer</span></h2>
+    <p class="lead"><span lang="vi">Trợ lý chạy trên một máy (ví dụ máy bàn có GPU). Laptop nào có AICW Gadgets chỉ cần dán mã kết nối là cài gadget giúp máy đó: danh sách gadget, tên, trợ lý đều đồng bộ hai chiều. Gadget nói chuyện qua kết nối mã hoá đầu cuối, không cần mở cổng mạng.</span><span lang="en">The agent runs on one computer (say a desktop with a GPU). Any laptop with AICW Gadgets pastes its connection code and sets up gadgets for it: the gadget list, names and agents stay in sync both ways. Gadgets talk over an end-to-end encrypted link, no port forwarding.</span></p>
+  </div>
+  <img class="shot" src="/img/app-ready.png" alt="AICW Gadgets app">
+</div></section>
+
+<section id="devices"><div class="wrap">
+  <div class="eyebrow">04 / <span data-i18n="dev_eb"></span></div>
+  <h2><span lang="vi"><!--COUNT--> board đã có firmware</span><span lang="en"><!--COUNT--> boards with firmware today</span></h2>
+  <p class="lead"><span lang="vi">App tự nhận ra board khi bạn cắm cáp và cài đúng firmware. Board có dấu <b style="color:var(--ok)">Đã test thật</b> là bản chúng tôi dùng hằng ngày; các board khác đã có firmware, đang chờ thêm người thử.</span><span lang="en">The app recognises the board when you plug it in and installs the right firmware. <b style="color:var(--ok)">Tested</b> boards are the ones we use every day; the others have firmware and are waiting for more testers.</span></p>
+  <div class="devices">
+<!--DEVICES-->
+  </div>
+  <div class="soon"><b data-i18n="soon"></b> <ul><!--SOON--></ul></div>
+  <p class="fine" data-i18n="fine"></p>
+</div></section>
+
+<section id="source"><div class="wrap">
+  <div class="eyebrow">05 / <span data-i18n="src_eb"></span></div>
+  <h2><span lang="vi">Mã nguồn mở, tự làm, tự sửa</span><span lang="en">Open source. Build it, hack it.</span></h2>
+  <p class="lead"><span lang="vi">Firmware và app đều mở theo giấy phép Apache 2.0. Thêm board mới, đổi khuôn mặt Dou, gắn cảm biến hay màn hình riêng: lấy code về và làm theo ý bạn. Firmware dựa trên Muse Gadget SDK của Meta.</span><span lang="en">Firmware and app are open under Apache 2.0. Add a board, redraw Dou's face, wire up your own sensors and screens. The firmware builds on Meta's Muse Gadget SDK.</span></p>
+  <div class="oss">
+    <a class="btn ghost" href="https://github.com/Neurons-AI/aicoworker-gadgets" target="_blank" rel="noopener">GitHub · Firmware</a>
+    <a class="btn ghost" href="https://github.com/Neurons-AI/aicw-gadgets-app" target="_blank" rel="noopener">GitHub · AI App</a>
+    <a class="btn ghost" href="https://github.com/Neurons-AI/aicoworker-gadgets/releases/latest" target="_blank" rel="noopener" data-i18n="releases"></a>
+  </div>
+  <p class="fine" data-i18n="risk"></p>
+</div></section>
+
+<footer><div class="wrap">
+  <div>© Neurons AI · <a href="https://aicoworker.net">AICoworker</a> · <a href="https://store.aicoworker.net">AICW Store</a></div>
+  <div><a href="https://aicoworker.net/privacy.html" data-i18n="privacy"></a> · <a href="https://aicoworker.net/terms.html" data-i18n="terms"></a></div>
+</div></footer>
+
+<script>
+(() => {
+const T = {
+  nav_how:['Cách hoạt động','How it works'], nav_start:['Bắt đầu','Get started'], nav_devices:['Thiết bị','Devices'], nav_source:['Mã nguồn','Source'],
+  eyebrow:['Gadget mã nguồn mở cho AICoworker','Open source gadgets for AICoworker'],
+  cta_start:['Bắt đầu ngay →','Get started →'], cta_store:['Xem trên AICW Store','View on AICW Store'],
+  hero_note:['Miễn phí · Windows, macOS, Linux · Giọng nói chạy ngay trên máy bạn','Free · Windows, macOS, Linux · Speech runs on your own computer'],
+  bubble1:['Mai mấy giờ họp nhỉ?','When is my meeting tomorrow?'], bubble2:['9 giờ sáng nha anh ✨','9 am, see you there ✨'],
+  how_eb:['Cách hoạt động','How it works'],
+  f1_t:['Trợ lý của bạn, không phải của ai khác','Your agent, nobody else’s'], f1_p:['Gadget nói chuyện với agent trên AICoworker của bạn: cùng trí nhớ, kỹ năng và công cụ.','The gadget talks to the agent on your AICoworker: same memory, skills and tools.'],
+  f2_t:['Nghe và nói ngay trên máy','Speech on your own machine'], f2_p:['Nhận giọng nói và đọc câu trả lời chạy miễn phí trên máy tính; dùng dịch vụ đám mây nếu bạn muốn.','Speech recognition and voice run free on your computer; use a cloud service if you prefer.'],
+  f3_t:['Cài một lần bằng cáp USB','One-time USB install'], f3_p:['App tự nhận board và nạp firmware AICW Gadget. Không cần cài công cụ lập trình.','The app detects the board and installs AICW Gadget firmware. No developer tools needed.'],
+  f4_t:['Kết nối qua Bluetooth','Bluetooth setup'], f4_p:['Nhập Wi-Fi, bấm nút trên gadget là xong. Mật khẩu Wi-Fi được gửi qua kênh mã hoá.','Type your Wi-Fi, press the gadget’s button, done. The password travels over an encrypted link.'],
+  f5_t:['Đi đâu cũng nối được','Works anywhere'], f5_p:['Gadget nối về máy bạn qua relay mã hoá đầu cuối của AICoworker, ở nhà hay ở quán cà phê.','Gadgets reach your computer through AICoworker’s end-to-end encrypted relay, at home or at a café.'],
+  f6_t:['Dou có cảm xúc','Dou has feelings'], f6_p:['Khuôn mặt Dou vui, buồn, ngại, suy nghĩ, ngủ gật... theo đúng câu chuyện.','Dou’s face smiles, blushes, thinks and dozes off to match the conversation.'],
+  start_eb:['Bắt đầu','Get started'],
+  s1_t:['Tải và cài AICoworker','Download and install AICoworker'], s1_p:['Ứng dụng trợ lý AI chạy trên máy tính của bạn. Mở lên, làm theo hướng dẫn chọn mô hình AI là xong.','The AI agent app that runs on your computer. Open it and follow the short setup to pick an AI model.'], s1_btn:['Tải AICoworker','Download AICoworker'],
+  s2_t:['Cài app AICW Gadgets từ AICW Store','Install AICW Gadgets from the AICW Store'], s2_p:['Trong AICoworker mở Skills → Store, tìm “AICW Gadgets” và bấm Cài đặt. App xuất hiện trong mục AI Apps.','In AICoworker open Skills → Store, search “AICW Gadgets” and press Install. The app appears under AI Apps.'], s2_btn:['Mở trên Store','Open in Store'],
+  s3_t:['Cài firmware AICW Gadget (chỉ gadget mới)','Install AICW Gadget firmware (new gadgets only)'], s3_p:['Mở AICW Gadgets → Thêm gadget, cắm gadget bằng cáp USB rồi bấm Cài firmware AICW Gadget. Mất khoảng 1 phút.','Open AICW Gadgets → Add gadget, plug the gadget in over USB and press Install AICW Gadget firmware. Takes about a minute.'],
+  s3_l1:['Dùng cáp có truyền dữ liệu: cáp chỉ để sạc là lý do hay gặp nhất khi app không thấy gadget.','Use a data cable: a charge-only cable is the most common reason the app cannot see the gadget.'],
+  s3_l2:['Không thấy? Rút cáp, giữ nút BOOT, cắm lại rồi thả nút, bấm cài lần nữa.','Not found? Unplug, hold the BOOT button, plug back in, release, and press install again.'],
+  s3_l3:['Tab Hướng dẫn trong app có cách xử lý từng lỗi.','The Help tab in the app covers every fix.'],
+  s4_t:['Kết nối qua Bluetooth','Connect over Bluetooth'], s4_p:['App tìm gadget gần đó. Nhập tên và mật khẩu Wi-Fi trước, rồi bấm nút trên gadget khi app nhắc.','The app finds the gadget nearby. Type your Wi-Fi name and password first, then press the button on the gadget when asked.'],
+  s4_l1:['Wi-Fi phải là 2.4 GHz.','Wi-Fi must be 2.4 GHz.'], s4_l2:['Gõ sai mật khẩu? App hỏi lại ngay, không phải làm lại từ đầu.','Wrong password? The app asks again right away, no need to start over.'], s4_l3:['Xong thì đặt tên gadget và chọn trợ lý nó sẽ nói chuyện cùng.','Then name the gadget and pick the agent it talks to.'],
+  s5_t:['Bấm nút và nói “Xin chào”','Press the button and say “Hello”'], s5_p:['Giữ nút, nói, thả ra. Trợ lý trả lời thành tiếng. Mọi cuộc trò chuyện nằm trong tab Hội thoại của app.','Hold the button, speak, let go. Your agent answers out loud. Every conversation is in the app’s Conversations tab.'],
+  tip:['💡 Trợ lý chạy trên máy khác (ví dụ máy bàn ở nhà)? Trên máy đó mở AICW Gadgets → Cài đặt → Máy chủ AI và sao chép mã kết nối. Trên laptop chọn Máy cài gadget và dán mã vào, rồi làm bước 3 và 4 như trên.','💡 Agent on another computer (say a desktop at home)? On that one open AICW Gadgets → Settings → AI computer and copy the connection code. On your laptop choose Setup computer, paste the code, then do steps 3 and 4.'],
+  two_eb:['Hai máy, một danh sách','Two computers, one list'],
+  dev_eb:['Thiết bị hỗ trợ','Supported devices'],
+  badge_tested:['Đã test thật','Tested'], badge_fw:['Có firmware','Firmware ready'], buy:['Mua','Buy'], source:['Cấu hình','Config'],
+  soon:['Đang làm:','In progress:'],
+  fine:['Thiết bị do các hãng khác sản xuất và bán; Neurons AI không bảo hành cho chúng. Tên và logo thuộc về chủ sở hữu.','Devices are made and sold by other companies; Neurons AI does not warrant them. Names and logos belong to their owners.'],
+  src_eb:['Mã nguồn','Source'], releases:['Bản firmware mới nhất','Latest firmware release'],
+  risk:['Firmware và app được cung cấp nguyên trạng, không bảo đảm. Tự làm phần cứng luôn có rủi ro: board treo, mất bảo hành, cháy pin. Hãy cẩn thận nhé.','Firmware and app are provided as-is, without warranty. Hardware tinkering has risks: bricked boards, voided warranties, puffy batteries. Be careful.'],
+  privacy:['Quyền riêng tư','Privacy'], terms:['Điều khoản','Terms'],
+};
+const root = document.documentElement, btn = document.getElementById('lang');
+function apply(l) {
+  const i = l === 'en' ? 1 : 0;
+  root.lang = l; root.dataset.lang = l; btn.textContent = l === 'en' ? 'VI' : 'EN';
+  document.querySelectorAll('[data-i18n]').forEach((el) => { const v = T[el.dataset.i18n]; if (v) el.textContent = v[i]; });
+  document.title = l === 'en' ? 'AICW Gadgets: your own AI, in your pocket' : 'AICW Gadgets: trợ lý AI bỏ túi của riêng bạn';
+  try { localStorage.setItem('lang', l); } catch {}
+}
+let lang = 'vi';
+try { lang = localStorage.getItem('lang') || (navigator.language.toLowerCase().startsWith('vi') ? 'vi' : 'en'); } catch {}
+apply(lang);
+btn.onclick = () => apply(root.dataset.lang === 'en' ? 'vi' : 'en');
+const faces = ['happy','love','think','surprised','shy','normal'];
+let k = 0; const img = document.getElementById('face');
+if (!matchMedia('(prefers-reduced-motion: reduce)').matches) setInterval(() => { k = (k + 1) % faces.length; img.style.opacity = 0; setTimeout(() => { img.src = '/img/dou-' + faces[k] + '.png'; img.style.opacity = 1; }, 250); }, 2600);
+})();
+</script>
+</body>
+</html>

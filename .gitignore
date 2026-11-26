@@ -1,20 +1,21 @@
 # build output
-esp32/build/
-esp32/build-*/
-esp32/managed_components/
-esp32/dependencies.lock
-esp32/sdkconfig
-esp32/sdkconfig.old
-esp32/log/
-*.log
 # secrets: each user makes their own
-esp32/dev_signing_key.pem
-bridge/relay-identity.json
-bridge/.venv/
 # your own avatar
-esp32/components/dou/avatar/
-__pycache__/
-*.wav
+*.log
 *.pcm
+*.wav
 .DS_Store
 LEDGER.md
+__pycache__/
+bridge/.venv/
+bridge/relay-identity.json
+esp32/build-*/
+esp32/build/
+esp32/components/dou/avatar/
+esp32/dependencies.lock
+esp32/dev_signing_key.pem
+esp32/log/
+esp32/managed_components/
+esp32/sdkconfig
+esp32/sdkconfig.old
+site/dist/
