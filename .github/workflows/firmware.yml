@@ -57,8 +57,8 @@ jobs:
           command: |
             set -e
             . "$IDF_PATH/export.sh" > /dev/null
-            # A throw-away development signing key: the image is signed for the app's own
-            # update check; boards flashed over USB do not enforce it.
+            # Throw-away development signing key (USB flashing does not check it).
+            # NOTE: this block runs inside bash -c with single quotes: never use an apostrophe here.
             [ -f dev_signing_key.pem ] || idf.py secure-generate-signing-key --version 2 --scheme rsa3072 dev_signing_key.pem
             idf.py -B build -DIDF_TARGET=${{ matrix.target }} \
               "-DSDKCONFIG_DEFAULTS=sdkconfig.defaults;${{ matrix.overlays }};devices/sdkconfig.aicw" build
