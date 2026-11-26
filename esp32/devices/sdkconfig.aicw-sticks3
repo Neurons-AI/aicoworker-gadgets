@@ -1,0 +1,5 @@
+# AICW Stick: push-to-talk to the AICoworker bridge (../docs/PROTOCOL.md)
+CONFIG_DOU_AICW_BRIDGE=y
+CONFIG_DOU_REALTIME_VOICE=n
+CONFIG_DOU_RESEND_NOTES=n
+CONFIG_GADGET_PRODUCT_NAME="Dou Gadget"

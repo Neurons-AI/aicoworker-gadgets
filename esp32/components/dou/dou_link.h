@@ -1,0 +1,142 @@
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#pragma once
+
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+
+#include "esp_err.h"
+#if __has_include("sdkconfig.h")
+#include "sdkconfig.h"   /* the ops table's layout depends on it: the same in every file */
+#endif
+
+#include "dou_wifi.h"
+
+typedef struct network_proxy_config network_proxy_config_t;
+
+/*
+ * Dou runs inside Home Link, which owns the radios, the setup credentials and
+ * the AICW account. Link registers these operations at boot
+ * (main/dou_glue.c); Dou's Wi-Fi status, scans, saved networks, BLE and Dou
+ * VM lookups all go through them. Every call is safe from any task.
+ */
+
+typedef enum {
+    DOU_LINK_BOOT,
+    DOU_LINK_UNPAIRED,       /* advertising for the AICW app */
+    DOU_LINK_PAIRING,        /* the app is connected */
+    DOU_LINK_CONFIRM,        /* waiting for a button press to confirm pairing */
+    DOU_LINK_CONNECTING,     /* joining Wi-Fi / reaching the VM */
+    DOU_LINK_ONLINE,
+    DOU_LINK_OFFLINE,
+    DOU_LINK_ERROR,
+} dou_link_state_t;
+
+/* A reply frame of a request on Link's session: see noise_ctrl_req_cb in main/noise_control.h.
+ * DOU_LINK_REQ_TOO_LARGE in place of -1: a reply frame too big for this board's
+ * buffers ended the session (NOISE_CTRL_REQ_TOO_LARGE). */
+#define DOU_LINK_REQ_TOO_LARGE (-2)
+typedef void (*dou_link_req_cb)(void *ctx, int status, const uint8_t *data, size_t len, bool end);
+
+typedef struct {
+    void (*wifi_status)(dou_wifi_status_t *out);
+    void (*wifi_apply)(void);                     /* on/off or credentials changed */
+    void (*wifi_get)(char *ssid, char *pass);     /* DOU_SSID_MAX+1 / DOU_PASS_MAX+1; pass may be NULL */
+    void (*wifi_set)(const char *ssid, const char *pass);
+    esp_err_t (*wifi_scan)(void);
+    bool (*wifi_scanning)(void);
+    int (*wifi_scan_results)(dou_wifi_ap_t *out, int max, uint32_t *gen);
+    void (*ble_apply)(void);                      /* BLE phone setup setting changed */
+    bool (*ble_started)(void);
+    bool (*hatch_linked)(void);                   /* paired to a AICW account */
+    const char *(*sdk_token)(void);               /* the maker's SDK token, or NULL */
+    bool (*sdk_token_set)(const char *token);     /* stores it and restarts; false if invalid */
+    bool (*sdk_token_changed)(void);              /* paired with another token: pair again to use this one */
+    /* Fills the VM whose id is want_vm (empty: Link's preferred VM). *vm_token is heap. */
+    bool (*hatch_vm)(const char *want_vm, char *vm_id, size_t id_cap, char *vm_name, size_t name_cap,
+                     char **vm_token);
+    /* A press that began after pressed_after_us (esp_timer's clock). true: Link
+     * used it (a pairing waits for a press, which confirms it if it began after
+     * the prompt). */
+    bool (*talk_press)(int64_t pressed_after_us);
+    void (*reset_setup)(void);                    /* forget Link setup and reboot */
+    /* Requests to the VM on Link's own Noise session, for boards without PSRAM for their own. */
+    bool (*req_ready)(void);                      /* the session is up */
+    int64_t (*req_open)(const char *verb, const char *path, const char *const *headers, bool end_body,
+                        dou_link_req_cb cb, void *ctx);
+    bool (*req_send)(int64_t id, const void *data, size_t len, bool end_body, int wait_ms);
+    void (*req_cancel)(int64_t id);
+#if CONFIG_DOU_WASM_APPS
+    size_t (*req_max_body)(void);                 /* the largest reply one frame can carry */
+#endif
+    void (*power_save)(bool on);                  /* screen off: the session polls less */
+    void (*wifi_nap)(bool nap);                   /* screen off a while: leave Wi-Fi until false */
+    void (*ble_quiet)(bool quiet);                /* a Wi-Fi video stream: no BLE advertising until false */
+    int (*wifi_saved)(dou_wifi_saved_t *out, int max);   /* most recently joined first */
+    int (*wifi_proxy_get)(const char *ssid, network_proxy_config_t *out);
+    bool (*wifi_proxy_set)(const char *ssid, const network_proxy_config_t *proxy);
+    void (*wifi_forget)(const char *ssid);        /* one saved network; empty forgets them all */
+} dou_link_ops_t;
+
+/* Pauses BLE advertising (setup's, or the companion's) while a Wi-Fi video
+ * stream plays: the radio's scheduler gives an advertising BLE half of every
+ * beacon period, and the stream's packets wait out that half. Connections
+ * stay up. Calls nest; false releases one. */
+void dou_link_ble_quiet(bool quiet);
+
+void dou_link_register(const dou_link_ops_t *ops);
+
+/* Link's status, mirrored from its LED state. */
+void dou_link_set_state(dou_link_state_t state);
+dou_link_state_t dou_link_state(void);
+const char *dou_link_state_name(dou_link_state_t state);
+
+bool dou_link_hatch_linked(void);
+const char *dou_link_sdk_token(void);
+bool dou_link_sdk_token_set(const char *token);
+bool dou_link_sdk_token_changed(void);
+bool dou_link_hatch_vm(const char *want_vm, char *vm_id, size_t id_cap, char *vm_name, size_t name_cap,
+                        char **vm_token);
+/* A press, now, of a control that can confirm pairing; true: Link used it.
+ * Only a press that began after the pairing prompt confirms it. released_us
+ * is when that control was last let go (esp_timer's clock), or 0 if the caller
+ * doesn't track it; dou_link_talk_press() passes 0. */
+bool dou_link_confirm_press(int64_t released_us);
+bool dou_link_talk_press(void);
+void dou_link_reset_setup(void);
+/* The first saved network, owned by Link. Return false when Link hasn't registered. */
+bool dou_link_wifi_get(char *ssid, char *pass);
+bool dou_link_wifi_set(const char *ssid, const char *pass);
+bool dou_link_ble_started(void);
+/* Requests on Link's session (noise_ctrl_req_* in main/noise_control.h); open returns 0 if down. */
+bool dou_link_req_ready(void);
+int64_t dou_link_req_open(const char *verb, const char *path, const char *const *headers, bool end_body,
+                           dou_link_req_cb cb, void *ctx);
+bool dou_link_req_send(int64_t id, const void *data, size_t len, bool end_body, int wait_ms);
+void dou_link_req_cancel(int64_t id);
+#if CONFIG_DOU_WASM_APPS
+/* The largest reply body one frame of Link's session can carry; bound a reply that
+ * could be larger, e.g. with Range (noise_ctrl_req_max_body). */
+size_t dou_link_req_max_body(void);
+#endif
+void dou_link_ble_apply(void);
+
+/* Proxy state: 0 saved, 1 saving, -1 unknown network, -2 last save failed.
+ * Set queues a write on Link's internal-stack keeper; get polls its result. */
+int dou_link_wifi_proxy_get(const char *ssid, network_proxy_config_t *out);
+bool dou_link_wifi_proxy_set(const char *ssid, const network_proxy_config_t *proxy);

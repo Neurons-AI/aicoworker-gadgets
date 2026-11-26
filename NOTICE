@@ -1,0 +1,23 @@
+AICoworker Gadgets
+Copyright (c) 2026 Neurons AI Company Limited (Công ty TNHH Neurons AI)
+
+This product is derived from the Muse Gadget SDK
+(https://github.com/facebookincubator/muse-gadget-sdk),
+Copyright (c) Meta Platforms, Inc. and affiliates, licensed under the
+Apache License, Version 2.0.
+
+Changes made by Neurons AI, 2026:
+  - Renamed the product, its strings, identifiers, files and settings
+    (Muse -> Dou, Meta -> AICW). Original copyright headers are kept in the
+    files they apply to.
+  - Replaced the default avatar and its animation with Dou, the AICW mascot.
+  - Added the AICW transport: push-to-talk to an AICoworker bridge over the
+    LAN or over the AICW relay (agent.aicoworker.net) with end-to-end
+    encryption (components/dou/aicw_*), and the bridge in bridge/.
+
+AICoworker Gadgets is not affiliated with, sponsored or endorsed by Meta.
+"Muse" and "Meta" are trademarks of their owners and are named here only to
+credit the source of this work.
+
+Third-party components keep their own licenses: see the license headers in
+each file and esp32/licenses/. aicw_tweetnacl.c is TweetNaCl (public domain).

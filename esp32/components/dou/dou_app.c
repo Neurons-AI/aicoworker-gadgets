@@ -1,0 +1,136 @@
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+#include "esp_heap_caps.h"
+#include "esp_log.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/queue.h"
+#include "freertos/task.h"
+
+#include "dou_audio.h"
+#if CONFIG_DOU_AVATAR_SYNC
+#include "dou_avatar.h"
+#endif
+#include "dou_battery.h"
+#include "dou_board.h"
+#include "dou_ble.h"
+#include "dou_chat.h"
+#include "dou_input.h"
+#include "dou_settings.h"
+#include "dou_state.h"
+#include "dou_text.h"
+#include "dou_ui.h"
+#include "dou_voice.h"
+#include "dou_wifi.h"
+#if CONFIG_DOU_VIDEO_WIFI
+#include "dou_video_wifi.h"
+#endif
+#if CONFIG_DOU_BOARD_SENSECAP_WATCHER || CONFIG_DOU_LATEST_REPLY
+#include "dou_review.h"
+#endif
+
+static const char *TAG = "dou";
+
+/* Applies saved settings to hardware; runs in whichever task changed them. */
+static void on_setting(dou_setting_t what)
+{
+    switch (what) {
+    case DOU_SETTING_VOLUME:
+        dou_audio_set_volume(dou_settings_volume());
+        break;
+    case DOU_SETTING_MIC_GAIN:
+        dou_audio_set_mic_gain(dou_settings_mic_gain());
+        break;
+    case DOU_SETTING_WIFI:
+        dou_wifi_apply();
+        break;
+    case DOU_SETTING_BLE:
+        dou_ble_apply();
+        break;
+    case DOU_SETTING_HATCH:
+#if CONFIG_DOU_AVATAR_SYNC
+        dou_avatar_pairing_changed();
+#endif
+        dou_hatch_config_changed();
+        break;
+    default:
+        break;   /* brightness, sleep and the speaker are polled where they're used */
+    }
+}
+
+const dou_board_t *dou_board;
+
+void dou_app_run(const dou_board_t *board)
+{
+    dou_board = board;
+    ESP_LOGI(TAG, "board: %s", board->name);
+    ESP_ERROR_CHECK(board->init());
+    ESP_ERROR_CHECK(dou_settings_init());
+    dou_settings_set_listener(on_setting);
+    dou_state_init();
+#if CONFIG_DOU_AVATAR_SYNC
+    dou_avatar_start();
+#endif
+#if CONFIG_DOU_BOARD_SENSECAP_WATCHER || CONFIG_DOU_LATEST_REPLY
+#if CONFIG_DOU_LATEST_REPLY
+    if (dou_review_init() != ESP_OK) ESP_LOGW(TAG, "latest reply storage unavailable");
+#else
+    ESP_ERROR_CHECK(dou_review_init());
+#endif
+#endif
+    dou_battery_init();
+#if CONFIG_DOU_LATIN_FONT
+    dou_text_keep_latin();   /* before the first caption, so it keeps its accents */
+#endif
+    dou_state_set_caption("WAKING UP...");
+    /* Before the UI: the touch boards' settings show Phone camera only when
+     * a transport is there as they're built. Its server waits for Wi-Fi. */
+#if CONFIG_DOU_VIDEO_WIFI
+    dou_video_wifi_start();
+#endif
+    ESP_ERROR_CHECK(dou_ui_start());
+    ESP_LOGI(TAG, "UI built: free internal %u", (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+
+    QueueHandle_t q = xQueueCreate(16, sizeof(dou_input_event_t));
+    ESP_ERROR_CHECK(dou_input_start(q));
+
+    /* Start audio before the boot animation's pause: its I2S DMA buffers
+     * need internal RAM, which Link's Wi-Fi and TLS take during those 1.4 s.
+     * Started after it, the codec open can fail to get them and crash in
+     * i2s_rx_channel_start (Waveshare 1.75C with live voice calls). */
+    bool has_audio = board->audio_init || board->mic_init;
+    esp_err_t voice_rc = has_audio ? dou_voice_start(q) : ESP_OK;
+    /* Let the boot animation (flame ignites, eyes open) play out. */
+    vTaskDelay(pdMS_TO_TICKS(1400));
+    if (!has_audio) {
+        ESP_LOGI(TAG, "display-only board: no microphone or speaker");
+        dou_state_set_mode(DOU_MODE_IDLE);
+        dou_state_set_caption("%s", "");
+    } else if (voice_rc != ESP_OK) {
+        ESP_LOGE(TAG, "voice pipeline unavailable");
+    } else {
+        dou_state_set_mode(DOU_MODE_IDLE);
+        dou_state_set_caption("%s", "");   /* the button icons say how to talk */
+    }
+
+    dou_hatch_start();
+    /* Home Link owns the radios; these just hand it the saved settings. */
+    dou_wifi_apply();
+    dou_ble_apply();
+    ESP_LOGI(TAG, "ready: free heap %u internal, %u psram",
+             (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+             (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+}

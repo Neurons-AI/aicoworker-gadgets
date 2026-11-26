@@ -1,0 +1,19 @@
+# build output
+esp32/build/
+esp32/build-*/
+esp32/managed_components/
+esp32/dependencies.lock
+esp32/sdkconfig
+esp32/sdkconfig.old
+esp32/log/
+*.log
+# secrets: each user makes their own
+esp32/dev_signing_key.pem
+bridge/relay-identity.json
+bridge/.venv/
+# your own avatar
+esp32/components/dou/avatar/
+__pycache__/
+*.wav
+*.pcm
+.DS_Store
