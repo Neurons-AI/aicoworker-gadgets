@@ -50,20 +50,23 @@ jobs:
 
       - name: Build
         uses: espressif/esp-idf-ci-action@9d38657f3d789ca759b2b37aaf5ceffbc42c4f0d # v1
+        env:
+          TARGET: ${{ matrix.target }}
+          DEFAULTS: sdkconfig.defaults;${{ matrix.overlays }};devices/sdkconfig.aicw
+          BOARD: ${{ matrix.board }}
         with:
           esp_idf_version: v6.0.3
           target: ${{ matrix.target }}
           path: esp32
+          extra_docker_args: -e TARGET -e DEFAULTS -e BOARD
+          # Runs inside bash -c with single quotes: no apostrophe anywhere in this block.
           command: |
             set -e
             . "$IDF_PATH/export.sh" > /dev/null
-            # Throw-away development signing key (USB flashing does not check it).
-            # NOTE: this block runs inside bash -c with single quotes: never use an apostrophe here.
             [ -f dev_signing_key.pem ] || idf.py secure-generate-signing-key --version 2 --scheme rsa3072 dev_signing_key.pem
-            idf.py -B build -DIDF_TARGET=${{ matrix.target }} \
-              "-DSDKCONFIG_DEFAULTS=sdkconfig.defaults;${{ matrix.overlays }};devices/sdkconfig.aicw" build
+            idf.py -B build -DIDF_TARGET="$TARGET" -DSDKCONFIG=build/sdkconfig -DSDKCONFIG_DEFAULTS="$DEFAULTS" build
             cd build
-            python -m esptool --chip ${{ matrix.target }} merge-bin -o ../aicw-gadgets-${{ matrix.board }}.bin @flash_args
+            python -m esptool --chip "$TARGET" merge-bin -o "../aicw-gadgets-$BOARD.bin" @flash_args
 
       - name: Describe
         run: |
