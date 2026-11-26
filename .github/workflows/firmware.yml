@@ -63,7 +63,7 @@ jobs:
           command: |
             set -e
             . "$IDF_PATH/export.sh" > /dev/null
-            [ -f dev_signing_key.pem ] || idf.py secure-generate-signing-key --version 2 --scheme rsa3072 dev_signing_key.pem
+            [ -f dev_signing_key.pem ] || espsecure generate-signing-key --version 2 --scheme rsa3072 dev_signing_key.pem
             idf.py -B build -DIDF_TARGET="$TARGET" -DSDKCONFIG=build/sdkconfig -DSDKCONFIG_DEFAULTS="$DEFAULTS" build
             cd build
             python -m esptool --chip "$TARGET" merge-bin -o "../aicw-gadgets-$BOARD.bin" @flash_args

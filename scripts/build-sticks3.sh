@@ -6,7 +6,7 @@
 set -e
 cd "$(dirname "$0")/../esp32"
 . "${IDF_PATH:-$HOME/esp/esp-idf-v6}/export.sh" >/dev/null 2>&1
-[ -f dev_signing_key.pem ] || idf.py secure-generate-signing-key --version 2 --scheme rsa3072 dev_signing_key.pem
+[ -f dev_signing_key.pem ] || espsecure generate-signing-key --version 2 --scheme rsa3072 dev_signing_key.pem
 ACT=build
 if [ "$1" = "flash" ]; then
   PORT=${PORT:-$(ls /dev/cu.usbmodem* /dev/ttyACM* 2>/dev/null | head -1)}
