@@ -33,11 +33,18 @@ typedef void (*ble_provision_cb)(const char *ssid, const char *password,
                                  const char *noise_host,
                                  const network_proxy_config_t *proxy,
                                  uint32_t session_generation);
+// AICW setup over BLE: Wi-Fi plus the AICW host ("relay:<hostId>" or "ip[:port]"),
+// no cloud tokens. Sent as provision_v2 with an "aicw_host" field.
+typedef void (*ble_provision_aicw_cb)(const char *ssid, const char *password,
+                                      const char *aicw_host,
+                                      const network_proxy_config_t *proxy,
+                                      uint32_t session_generation);
 typedef void (*ble_ota_cb)(const char *url, bool force);
 typedef void (*ble_simple_cb)(void);
 
 typedef struct {
     ble_provision_cb on_provision;
+    ble_provision_aicw_cb on_provision_aicw;
     ble_simple_cb    on_wifi_scan;
     ble_ota_cb       on_ota;
     ble_simple_cb    on_unpair;

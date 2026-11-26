@@ -15,6 +15,9 @@
  */
 
 #include "app.h"
+#if CONFIG_DOU_AICW_BRIDGE
+#include "dou_chat.h"
+#endif
 #include "stack_monitor.h"
 
 #include <string.h>
@@ -1413,6 +1416,75 @@ done:
     operation_gate_give();
 }
 
+#if CONFIG_DOU_AICW_BRIDGE
+// AICW setup over BLE: join Wi-Fi, save the AICW host, finish setup. The gadget
+// then talks to that host (a bridge on the user's own computer), so there are
+// no cloud tokens and no endpoints to store.
+static void on_provision_aicw(const char *ssid, const char *password,
+                              const char *aicw_host,
+                              const network_proxy_config_t *proxy,
+                              uint32_t session_generation) {
+    if (session_generation == 0) return;
+    if (!operation_gate_take(0, "BLE provision")) {
+        ble_server_send_pairing_status("error_operation_in_progress", session_generation);
+        return;
+    }
+    if (!link_pairing_provisioning_session_valid(session_generation)) goto done;
+
+    setup_stage_set("wifi");
+    ble_server_send_pairing_status("wifi_connecting", session_generation);
+    if (!require_provisioning_pairing_session(session_generation)) goto done;
+    ui_set_status("wifi_connecting");
+    led_status_set_state(LED_STATE_WIFI_CONNECTING);
+    if (!wifi_mgr_connect(ssid, password, WIFI_CONNECT_TIMEOUT_MS)) {
+        setup_fail_for_session("wifi", "wifi_failed", session_generation);
+        goto done;
+    }
+    if (!require_provisioning_pairing_session(session_generation)) goto done;
+    ble_server_send_pairing_status("wifi_connected", session_generation);
+    if (!require_provisioning_pairing_session(session_generation)) goto done;
+    ui_set_wifi(ssid);
+    ui_set_status("wifi_connected");
+    led_status_set_state(LED_STATE_WIFI_CONNECTED);
+    remember_joined_wifi(ssid, password);
+    if (proxy) {
+        if (!wifi_known_set_proxy(ssid, proxy)) {
+            setup_fail_for_session("storage", "error_storage", session_generation);
+            goto done;
+        }
+        network_proxy_set_active(proxy);
+    }
+    persist_connected_wifi_channel();
+
+    setup_stage_set("auth");
+    if (!aicw_host_set(aicw_host)) {
+        setup_fail_for_session("storage", "error_storage", session_generation);
+        goto done;
+    }
+    ESP_LOGI(TAG, "AICW host set over BLE: %s", aicw_host);
+
+    if (!require_provisioning_pairing_session(session_generation)) goto done;
+    setup_stage_set("done");
+    ble_server_send_pairing_status("auth_ok", session_generation);
+    if (!require_provisioning_pairing_session(session_generation)) goto done;
+    ui_set_status("auth_ok");
+    led_status_set_state(LED_STATE_AUTH_OK);
+    if (!complete_setup_and_stop_ble("provision_aicw", session_generation)) {
+        setup_fail_for_session("storage", "error_storage", session_generation);
+        goto done;
+    }
+#if PAIR_THEN_RESTART
+    ESP_LOGI(TAG, "paired (AICW); restarting to connect without BLE");
+    vTaskDelay(pdMS_TO_TICKS(2000));
+    if (xTaskCreate(restart_task, "restart", 2048, NULL, 3, NULL) != pdPASS) {
+        esp_restart();
+    }
+#endif
+done:
+    operation_gate_give();
+}
+#endif
+
 static bool send_cached_scan_to_client(void) {
     uint32_t session_generation = link_pairing_session_generation();
     if (!link_pairing_session_confirmed()) return false;
@@ -1568,6 +1640,10 @@ static bool reset_setup_with_gate_held(const char *source,
                                        setup_reset_scope_t scope) {
     ESP_LOGI(TAG, "%s - reset setup", source);
     setup_stage_set("reset");
+#if CONFIG_DOU_AICW_BRIDGE
+    // The AICW host is this gadget's pairing: a reset forgets it too.
+    (void)aicw_host_set("");
+#endif
     if (!setup_wipe_to_clean(scope)) {
         ESP_LOGE(TAG, "%s - setup deletion failed; reset aborted", source);
         ui_set_status("error_storage");
@@ -2479,6 +2555,9 @@ static void start_ble_setup_server_if_needed(void) {
 
     ble_callbacks_t cb = {
         .on_provision = on_provision,
+#if CONFIG_DOU_AICW_BRIDGE
+        .on_provision_aicw = on_provision_aicw,
+#endif
         .on_wifi_scan = on_wifi_scan,
         .on_ota = on_ble_ota,
         .on_unpair = on_unpair,
@@ -3078,6 +3157,14 @@ void app_run(void) {
 
     bool setup_complete = config_setup_complete();
     bool provisioned = config_is_provisioned();
+#if CONFIG_DOU_AICW_BRIDGE
+    // An AICW setup keeps no cloud tokens: the saved AICW host is its pairing.
+    if (!provisioned) {
+        char aicw_host[128];
+        aicw_host_get(aicw_host);
+        if (aicw_host[0]) provisioned = true;
+    }
+#endif
 
     if (CONFIG_HOMEHUB_WIFI_SSID[0]) {
         // Dev override supplies Wi-Fi from menuconfig and may run token-only in

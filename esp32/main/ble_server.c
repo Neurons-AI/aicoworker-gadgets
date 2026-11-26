@@ -127,6 +127,7 @@ typedef struct {
     char *api_url;
     char *api_url_v2;
     char *noise_host;
+    char *aicw_host;
     bool proxy_present;
     network_proxy_config_t proxy;
     uint32_t session_generation;
@@ -162,6 +163,14 @@ static void delete_command_json(cJSON *root, bool decrypted) {
 
 static void provision_task(void *arg) {
     provision_args_t *a = (provision_args_t *)arg;
+#if CONFIG_DOU_AICW_BRIDGE
+    if (a->aicw_host && s_cb.on_provision_aicw
+        && link_pairing_provisioning_session_valid(a->session_generation)) {
+        s_cb.on_provision_aicw(a->ssid ? a->ssid : "", a->password ? a->password : "",
+                               a->aicw_host, a->proxy_present ? &a->proxy : NULL,
+                               a->session_generation);
+    } else
+#endif
     if (s_cb.on_provision
         && link_pairing_provisioning_session_valid(a->session_generation)) {
         s_cb.on_provision(a->ssid ? a->ssid : "",
@@ -186,6 +195,7 @@ static void provision_task(void *arg) {
     secure_free_str(a->api_url);
     secure_free_str(a->api_url_v2);
     secure_free_str(a->noise_host);
+    secure_free_str(a->aicw_host);
     network_proxy_wipe(&a->proxy, sizeof(a->proxy));
     free(a);
     stack_monitor_record(NULL);
@@ -439,7 +449,45 @@ static void dispatch_command_ex(const uint8_t *data, size_t len, bool decrypted)
         cJSON *u = cJSON_GetObjectItem(root, "username");
         cJSON *tt = cJSON_GetObjectItem(root, "token_type");
         const char *ota_url = optional_ota_url(root);
-        if (!cJSON_IsString(s) || !cJSON_IsString(p) || !cJSON_IsString(at)
+#if CONFIG_DOU_AICW_BRIDGE
+        // AICW setup: Wi-Fi + the AICW host the gadget talks to, no cloud tokens.
+        cJSON *ah = cJSON_GetObjectItem(root, "aicw_host");
+        bool aicw_setup = cJSON_IsString(ah) && ah->valuestring && *ah->valuestring
+                          && strlen(ah->valuestring) <= 120
+                          && cJSON_IsString(s) && s->valuestring && *s->valuestring
+                          && cJSON_IsString(p) && p->valuestring;
+#else
+        bool aicw_setup = false;
+#endif
+        if (aicw_setup) {
+            cJSON *proxy = cJSON_GetObjectItemCaseSensitive(root, "proxy");
+            provision_args_t *a = calloc(1, sizeof(*a));
+            if (!a) {
+                ble_server_send_status("error_operation_in_progress");
+            } else if (!network_proxy_parse(proxy, &a->proxy)) {
+                free(a);
+                ble_server_send_status("error_invalid_proxy");
+            } else {
+                a->proxy_present = proxy != NULL;
+                a->ssid = dup_str(s->valuestring);
+                a->password = dup_str(p->valuestring);
+#if CONFIG_DOU_AICW_BRIDGE
+                a->aicw_host = dup_str(ah->valuestring);
+#endif
+                a->session_generation = link_pairing_mark_provisioning_active();
+                if (!a->ssid || !a->password || !a->aicw_host || a->session_generation == 0
+                    || helper_task_create(provision_task, "prov", 8192, a, 5, NULL) != pdPASS) {
+                    uint32_t generation = a->session_generation;
+                    secure_free_str(a->ssid);
+                    secure_free_str(a->password);
+                    secure_free_str(a->aicw_host);
+                    network_proxy_wipe(&a->proxy, sizeof(a->proxy));
+                    free(a);
+                    ble_server_send_pairing_status("error_operation_in_progress", generation);
+                    ble_server_disconnect_pairing_session(generation);
+                }
+            }
+        } else if (!cJSON_IsString(s) || !cJSON_IsString(p) || !cJSON_IsString(at)
             || !s->valuestring || !p->valuestring || !at->valuestring
             || !*s->valuestring || !*p->valuestring || !*at->valuestring
             || !cJSON_IsString(rt) || !rt->valuestring || !*rt->valuestring
