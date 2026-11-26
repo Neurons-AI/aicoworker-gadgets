@@ -56,6 +56,7 @@ jobs:
           path: esp32
           command: |
             set -e
+            . "$IDF_PATH/export.sh" > /dev/null
             # A throw-away development signing key: the image is signed for the app's own
             # update check; boards flashed over USB do not enforce it.
             [ -f dev_signing_key.pem ] || idf.py secure-generate-signing-key --version 2 --scheme rsa3072 dev_signing_key.pem
