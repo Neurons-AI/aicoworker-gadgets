@@ -156,7 +156,11 @@ static bool ws_connect(void)
     cJSON_AddStringToObject(o, "type", "hello");
     cJSON_AddStringToObject(o, "device", "m5stack-sticks3");
     cJSON_AddStringToObject(o, "mac", macs);
-    cJSON_AddStringToObject(o, "fw", "aicw-0.2");
+    cJSON_AddStringToObject(o, "fw", "aicw-0.3");
+    cJSON_AddBoolToObject(o, "set_wifi", true);   /* this firmware takes Wi-Fi over the link */
+    dou_wifi_status_t ws;
+    dou_wifi_status(&ws);
+    if (ws.ssid[0]) cJSON_AddStringToObject(o, "ssid", ws.ssid);
     if (!send_json(o)) return false;
     ESP_LOGI(TAG, "connected (%s)", s_relay ? "relay" : "lan");
     dou_hatch_report(DOU_HATCH_REACHABLE, s_relay ? "Đã kết nối AICW (relay)" : "Đã kết nối AICW");
@@ -175,6 +179,28 @@ static void on_text(const char *s, size_t len)
     const char *text = cJSON_GetStringValue(cJSON_GetObjectItem(o, "text"));
     if (!type) goto out;
     if (!strcmp(type, "ready") || !strcmp(type, "pong")) goto out;
+    if (!strcmp(type, "set_wifi")) {
+        /* The owner changes the network from AICW Gadgets: the gadget saves it first among
+         * its known networks and rejoins. When it cannot join, the Wi-Fi keeper falls back
+         * to the other saved networks, so a wrong password never strands the gadget. */
+        const char *ssid = cJSON_GetStringValue(cJSON_GetObjectItem(o, "ssid"));
+        const char *pass = cJSON_GetStringValue(cJSON_GetObjectItem(o, "password"));
+        size_t sl = ssid ? strlen(ssid) : 0, pl = pass ? strlen(pass) : 0;
+        cJSON *r = cJSON_CreateObject();
+        if (!sl || sl > DOU_SSID_MAX || pl > DOU_PASS_MAX || (pl && pl < 8)) {
+            cJSON_AddStringToObject(r, "type", "wifi_rejected");
+            cJSON_AddStringToObject(r, "reason", !sl || sl > DOU_SSID_MAX ? "ssid" : "password");
+            send_json(r);
+            goto out;
+        }
+        ESP_LOGI(TAG, "new wifi network from AICW: %s", ssid);
+        cJSON_AddStringToObject(r, "type", "wifi_saved");
+        cJSON_AddStringToObject(r, "ssid", ssid);
+        send_json(r);   /* before switching: the link drops when Wi-Fi changes */
+        vTaskDelay(pdMS_TO_TICKS(300));
+        dou_settings_set_wifi(ssid, pass ? pass : "");
+        goto out;
+    }
     if (!id || id != s_turn) goto out;   /* a cancelled or older turn */
 
     if (s_text_turn) {
