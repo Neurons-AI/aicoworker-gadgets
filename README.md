@@ -1,5 +1,8 @@
 # AICoworker Gadgets
 
+> **Install and set up gadgets with the AICoworker AI App:** [Neurons-AI/aicw-gadgets-app](https://github.com/Neurons-AI/aicw-gadgets-app) — flashes this firmware over USB, pairs over Bluetooth, runs the voice link.
+
+
 Hold a button on a pocket-size board, talk, and hear **your own AICoworker
 agent** answer — at home over Wi-Fi, or from anywhere through the AICW relay.
 
