@@ -82,6 +82,11 @@ static bool s_sending;           /* mic audio still going up */
 static bool s_text_turn;         /* typed turn: reply goes to the console */
 static uint32_t s_audio_turn;    /* turn whose speech is arriving */
 static int64_t s_heard_by, s_done_by, s_last_tx, s_next_try;
+/* Last time anything came from the bridge or the relay (pongs included). The relay can drop
+ * a link while Wi-Fi dozes on battery and nothing tells us: a link silent this long is dead. */
+static int64_t s_last_rx;
+#define SILENT_US (45 * 1000000LL)
+#define FRESH_US (25 * 1000000LL)
 
 /* Caption state, shared with the voice task */
 static portMUX_TYPE s_lock = portMUX_INITIALIZER_UNLOCKED;
@@ -162,6 +167,7 @@ static bool ws_connect(void)
     dou_wifi_status(&ws);
     if (ws.ssid[0]) cJSON_AddStringToObject(o, "ssid", ws.ssid);
     if (!send_json(o)) return false;
+    s_last_rx = now_us();
     ESP_LOGI(TAG, "connected (%s)", s_relay ? "relay" : "lan");
     dou_hatch_report(DOU_HATCH_REACHABLE, s_relay ? "Đã kết nối AICW (relay)" : "Đã kết nối AICW");
     return true;
@@ -315,6 +321,7 @@ static void poll_socket(void)
     while (s_sock >= 0 && s_rx_len < RX_CAP) {
         int n = io_read(s_rx + s_rx_len, RX_CAP - s_rx_len);
         if (n > 0) {
+            s_last_rx = now_us();
             s_rx_len += n;
             parse_frames();
             continue;
@@ -332,6 +339,10 @@ static void poll_socket(void)
 
 static bool ensure_connected(void)
 {
+    if (s_sock >= 0 && now_us() - s_last_rx > FRESH_US) {
+        /* Nothing heard for a while (Wi-Fi was dozing): do not trust this link with a turn. */
+        ws_close("stale before turn");
+    }
     if (s_sock >= 0) return true;
     if (!dou_hatch_configured() || !dou_wifi_connected()) return false;
     return ws_connect();
@@ -456,6 +467,11 @@ static void session_task(void *arg)
             send_simple("cancel", s_turn);
             s_turn = 0;
             s_heard_by = s_done_by = 0;
+        }
+        if (s_sock >= 0 && s_last_rx && t - s_last_rx > SILENT_US) {
+            ws_close("link silent");
+            s_next_try = 0;
+            continue;
         }
         if (s_sock >= 0 && t - s_last_tx > PING_US) {
             cJSON *o = cJSON_CreateObject();

@@ -38,6 +38,9 @@
 #include "dou_ble.h"
 #include "dou_board.h"
 #include "dou_chat.h"
+#if CONFIG_DOU_HATCH
+#include "dou_chat_priv.h"
+#endif
 #include "dou_options.h"
 #include "dou_console.h"
 #include "dou_link.h"
@@ -644,8 +647,15 @@ static bool update_wifi_nap(TickType_t now, bool paused)
         s_nap_now = false;
         dou_state_set_as_if_battery(false);
     }
+    /* A gadget that talks to an AI computer keeps Wi-Fi (in modem sleep) while it sleeps:
+     * with Wi-Fi off a press had to rejoin and reconnect first, and the question was saved
+     * for later instead of answered ("SAVED, WILL TRY AGAIN" on battery). ">nap" still naps. */
+    bool keep = false;
+#if CONFIG_DOU_HATCH
+    keep = dou_hatch_ready() || dou_hatch_configured();
+#endif
     bool nap = paused && !dou_voice_notes_waiting()
-               && (s_nap_now || (s_cpu_low && now - low_since >= pdMS_TO_TICKS(WIFI_NAP_MS)));
+               && (s_nap_now || (!keep && s_cpu_low && now - low_since >= pdMS_TO_TICKS(WIFI_NAP_MS)));
     if (nap != napping) {
         napping = nap;
         ESP_LOGI(TAG, "Wi-Fi %s", nap ? "napping" : "waking");
@@ -1027,6 +1037,17 @@ static bool console_command(char *line, bool whole)
             free(json);
         }
         fflush(stdout);
+        return true;
+    }
+    /* "battery": sleep exactly as on battery (auto-sleep, Wi-Fi rest), but without forcing
+     * Wi-Fi off like "nap": the way to test the real battery path over the USB cable. */
+    if (!strcmp(line, "battery")) {
+        dou_state_set_as_if_battery(true);
+        set_asleep(true, "serial battery");
+        return true;
+    }
+    if (!strcmp(line, "battery.off")) {
+        dou_state_set_as_if_battery(false);
         return true;
     }
     if (!strcmp(line, "nap")) {
